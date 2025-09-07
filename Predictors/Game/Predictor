@@ -1,0 +1,219 @@
+
+
+
+
+# Training the model
+epochs = 1000
+for epoch in range(epochs):
+    model.train()
+    optimizer.zero_grad()
+    outputs = model(X_train)
+    loss = criterion(outputs, y_train)
+    loss.backward()
+    optimizer.step()
+    
+    if (epoch+1) % 100 == 0:
+        print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
+
+# Model evaluation
+model.eval()
+with torch.no_grad():
+    y_pred_train = model(X_train).detach()
+    y_pred_test = model(X_test).detach()
+    
+train_accuracy = ((y_pred_train > 0.5) == y_train).float().mean()
+test_accuracy = ((y_pred_test > 0.5) == y_test).float().mean()
+
+print(f'Train Accuracy: {train_accuracy:.4f}')
+print(f'Test Accuracy: {test_accuracy:.4f}')
+
+
+
+
+
+
+
+
+# Implementing L2 regularization (Ridge Regression)
+optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=0.01)
+
+# Retrain the model with L2 regularization
+epochs = 1000
+for epoch in range(epochs):
+    model.train()
+    optimizer.zero_grad()
+    outputs = model(X_train)
+    loss = criterion(outputs, y_train)
+    loss.backward()
+    optimizer.step()
+    
+    if (epoch+1) % 100 == 0:
+        print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
+
+# Evaluate the optimized model
+model.eval()
+with torch.no_grad():
+    y_pred_train = model(X_train).detach()
+    y_pred_test = model(X_test).detach()
+    
+train_accuracy = ((y_pred_train > 0.5) == y_train).float().mean()
+test_accuracy = ((y_pred_test > 0.5) == y_test).float().mean()
+
+print(f'Train Accuracy: {train_accuracy:.4f}')
+print(f'Test Accuracy: {test_accuracy:.4f}')
+
+
+
+
+
+
+
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc
+import itertools
+
+# Visualize the confusion matrix
+y_pred_test_labels = (y_pred_test > 0.5).float()
+cm = confusion_matrix(y_test, y_pred_test_labels)
+
+plt.figure(figsize=(6, 6))
+plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+plt.title('Confusion Matrix')
+plt.colorbar()
+tick_marks = range(2)
+plt.xticks(tick_marks, ['Loss', 'Win'], rotation=45)
+plt.yticks(tick_marks, ['Loss', 'Win'])
+
+thresh = cm.max() / 2
+for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+    plt.text(j, i, cm[i, j], horizontalalignment="center", color="white" if cm[i, j] > thresh else "black")
+
+plt.tight_layout()
+plt.ylabel('True label')
+plt.xlabel('Predicted label')
+plt.show()
+
+# Print classification report
+print("Classification Report:\n", classification_report(y_test, y_pred_test_labels, target_names=['Loss', 'Win']))
+
+# Plot ROC curve
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_test)
+roc_auc = auc(fpr, tpr)
+
+plt.figure()
+plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC)')
+plt.legend(loc="lower right")
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Save the model
+torch.save(model.state_dict(), 'logistic_regression_model.pth')
+
+# Load the model
+loaded_model = LogisticRegressionModel(input_dim)
+loaded_model.load_state_dict(torch.load('logistic_regression_model.pth'))
+
+# Ensure the loaded model is in evaluation mode
+loaded_model.eval()
+
+# Evaluate the loaded model
+with torch.no_grad():
+    y_pred_test_loaded = loaded_model(X_test).detach()
+    loaded_test_accuracy = ((y_pred_test_loaded > 0.5) == y_test).float().mean()
+    print(f'Loaded Model Test Accuracy: {loaded_test_accuracy:.4f}')
+
+
+
+
+
+
+
+
+learning_rates = [0.01, 0.05, 0.1]
+best_accuracy = 0
+best_lr = 0
+
+for lr in learning_rates:
+    # Reinitialize the model and optimizer for each learning rate
+    model = LogisticRegressionModel(input_dim)
+    criterion = nn.BCELoss()
+    optimizer = optim.SGD(model.parameters(), lr=lr)
+    
+    # Training the model
+    epochs = 1000
+    for epoch in range(epochs):
+        model.train()
+        optimizer.zero_grad()
+        outputs = model(X_train)
+        loss = criterion(outputs, y_train)
+        loss.backward()
+        optimizer.step()
+        
+        if (epoch+1) % 100 == 0:
+            print(f'Learning Rate: {lr}, Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
+    
+    # Evaluate the model
+    model.eval()
+    with torch.no_grad():
+        y_pred_test = model(X_test).detach()
+        test_accuracy = ((y_pred_test > 0.5) == y_test).float().mean()
+        print(f'Learning Rate: {lr}, Test Accuracy: {test_accuracy:.4f}')
+        
+        if test_accuracy > best_accuracy:
+            best_accuracy = test_accuracy
+            best_lr = lr
+
+print(f'Best Learning Rate: {best_lr}, Best Test Accuracy: {best_accuracy:.4f}')
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Extract the weights of the linear layer
+weights = model.linear.weight.data.numpy().flatten()
+features = X.columns
+
+# Create a DataFrame for feature importance
+feature_importance = pd.DataFrame({'Feature': features, 'Importance': weights})
+feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
+
+print(feature_importance)
+
+# Plot feature importance
+plt.figure(figsize=(10, 6))
+plt.bar(feature_importance['Feature'], feature_importance['Importance'])
+plt.xlabel('Features')
+plt.ylabel('Importance')
+plt.title('Feature Importance')
+plt.xticks(rotation=45)
+plt.show()
+
+
+
+
+
